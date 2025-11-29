@@ -22,7 +22,7 @@
         {% include 'config_items/vision_api_provider.html' %}
     {% elif key == 'VISION_MODEL' %}
         {% include 'config_items/vision_model_selector.html' %}
-    {% elif key == 'TEMPERATURE' or key == 'VISION_TEMPERATURE' or key == 'INTENT_TEMPERATURE'%}
+    {% elif key == 'TEMPERATURE' or key == 'VISION_TEMPERATURE' or key == 'INTENT_TEMPERATURE' or key == 'REPLY_DECISION_TEMPERATURE'%}
         {% include 'config_items/temperature_slider.html' %}
     {% elif key == 'NETWORK_SEARCH_ENABLED' or key == 'WEBLENS_ENABLED' %}
         {% include 'config_items/switch_toggle.html' %}

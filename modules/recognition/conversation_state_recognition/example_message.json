@@ -1,0 +1,62 @@
+{
+  "example1": {
+    "input": {
+      "role": "user",
+      "content": "最近对话历史：\n用户：今天天气怎么样？\nassistant：今天天气不错，阳光明媚呢\n用户：那我们出去玩吧"
+    },
+    "output": {
+      "role": "assistant",
+      "content": "{\"state\": \"ONGOING\", \"confidence\": 0.95, \"reason\": \"用户提出新建议\", \"should_reply\": true}"
+    }
+  },
+  "example2": {
+    "input": {
+      "role": "user",
+      "content": "最近对话历史：\n用户：帮我查一下明天的天气\nassistant：明天多云，气温15-22度\n用户：好的知道了"
+    },
+    "output": {
+      "role": "assistant",
+      "content": "{\"state\": \"ENDING\", \"confidence\": 0.8, \"reason\": \"简短确认无后续\", \"should_reply\": false}"
+    }
+  },
+  "example3": {
+    "input": {
+      "role": "user",
+      "content": "最近对话历史：\n用户：今天聊得很开心\nassistant：我也是呢，很高兴和你聊天\n用户：那我先去睡觉了，晚安"
+    },
+    "output": {
+      "role": "assistant",
+      "content": "{\"state\": \"ENDED\", \"confidence\": 0.98, \"reason\": \"明确告别语晚安\", \"should_reply\": true}"
+    }
+  },
+  "example4": {
+    "input": {
+      "role": "user",
+      "content": "最近对话历史：\n用户：我要去开会了\nassistant：好的，开会顺利\n用户：拜拜"
+    },
+    "output": {
+      "role": "assistant",
+      "content": "{\"state\": \"ENDED\", \"confidence\": 0.95, \"reason\": \"明确告别\", \"should_reply\": true}"
+    }
+  },
+  "example5": {
+    "input": {
+      "role": "user",
+      "content": "最近对话历史：\n用户：这个问题怎么解决？\nassistant：你可以试试重启一下\n用户：嗯嗯"
+    },
+    "output": {
+      "role": "assistant",
+      "content": "{\"state\": \"ENDING\", \"confidence\": 0.75, \"reason\": \"简短确认\", \"should_reply\": false}"
+    }
+  },
+  "example6": {
+    "input": {
+      "role": "user",
+      "content": "最近对话历史：\n用户：你觉得这个方案怎么样？\nassistant：我觉得挺不错的\n用户：那具体应该怎么实施呢？"
+    },
+    "output": {
+      "role": "assistant",
+      "content": "{\"state\": \"ONGOING\", \"confidence\": 0.9, \"reason\": \"继续深入讨论\", \"should_reply\": true}"
+    }
+  }
+}

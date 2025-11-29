@@ -33,6 +33,7 @@ import emoji
 # 修改logger获取方式，确保与main模块一致
 logger = logging.getLogger('main')
 
+
 class LLMService:
     def __init__(self, api_key: str, base_url: str, model: str,
                  max_token: int, temperature: float, max_groups: int, auto_model_switch: bool = False):
@@ -100,29 +101,29 @@ class LLMService:
         # 维护上下文窗口
         while len(self.chat_contexts[user_id]) > self.config["max_groups"] * 2:
             # 优先保留最近的对话组
-            self.chat_contexts[user_id] = self.chat_contexts[user_id][-self.config["max_groups"]*2:]
-    
+            self.chat_contexts[user_id] = self.chat_contexts[user_id][-self.config["max_groups"] * 2:]
+
     def _build_time_context(self, user_id: str) -> str:
         """构建时间上下文信息"""
         if user_id not in self.chat_contexts or len(self.chat_contexts[user_id]) < 2:
             return "这是你们今天的第一次对话。"
-    
+
         try:
             # 获取最后两条消息的时间
             recent_messages = self.chat_contexts[user_id][-2:]
-        
+
             last_msg_time = None
             current_time = datetime.datetime.now()
-        
+
             for msg in reversed(recent_messages):
                 if 'timestamp' in msg:
                     last_msg_time = datetime.datetime.fromisoformat(msg['timestamp'])
                     break
-        
+
             if last_msg_time:
                 time_diff = current_time - last_msg_time
                 seconds = int(time_diff.total_seconds())
-            
+
                 if seconds < 60:
                     time_desc = f"距离上条消息仅过去了{seconds}秒"
                 elif seconds < 3600:
@@ -131,12 +132,12 @@ class LLMService:
                 else:
                     hours = seconds // 3600
                     time_desc = f"距离上条消息过去了{hours}小时"
-                
+
                 return f"{time_desc}，请根据时间的流逝，调整回答内容。"
-        
+
         except Exception as e:
             logger.error(f"构建时间上下文失败: {str(e)}")
-    
+
         return "请注意时间的连续性。"
 
     def _sanitize_response(self, raw_text: str) -> str:
@@ -237,7 +238,8 @@ class LLMService:
             logger.error(f"验证响应时发生错误: {str(e)}")
             return False
 
-    def get_response(self, message: str, user_id: str, system_prompt: str, previous_context: List[Dict] = None, core_memory: str = None) -> str:
+    def get_response(self, message: str, user_id: str, system_prompt: str, previous_context: List[Dict] = None,
+                     core_memory: str = None) -> str:
         """
         完整请求处理流程
         Args:
@@ -264,7 +266,7 @@ class LLMService:
         # —— 阶段3：构建请求参数 ——
         # 时间间隔
         time_context = self._build_time_context(user_id)
-        
+
         # 获取当前时间并格式化
         now = datetime.datetime.now()
         weekdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
@@ -273,12 +275,12 @@ class LLMService:
         # 获取农历日期
         try:
             lunar_date = ZhDate.from_datetime(now)
-            lunar_date_str = lunar_date.chinese() # 这会生成类似 "甲辰龙年腊月廿三" 的字符串
+            lunar_date_str = lunar_date.chinese()  # 这会生成类似 "甲辰龙年腊月廿三" 的字符串
         except Exception as e:
             logger.error(f"获取农历日期失败: {str(e)}")
-            lunar_date_str = "未知" # 如果失败则提供一个默认值        
+            lunar_date_str = "未知"  # 如果失败则提供一个默认值        
         time_prompt = f"当前时间是 {current_time_str}，{lunar_date_str}。你必须根据当前时间来生成你的回复内容。 {time_context} ，你的活动要符合当前时间段"
-        
+
         # 读取基础Prompt
         try:
             # 从当前文件位置(llm_service.py)向上导航到项目根目录
@@ -293,7 +295,8 @@ class LLMService:
             base_content = ""
 
         try:
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # 项目根目录
+            project_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # 项目根目录
             worldview_path = os.path.join(project_root, "src", "base", "worldview.md")
             with open(worldview_path, "r", encoding="utf-8") as f:
                 worldview_content = f.read()
@@ -310,7 +313,8 @@ class LLMService:
             character_prompt = f"{base_content}\n\n你所饰演的角色所处世界的世界观为：\n{worldview_content}\n\n你所扮演的角色介绍如下：\n{system_prompt}"
         elif not worldview_content and core_memory:
             character_prompt = f"{base_content}\n\n你所饰演角色所具备的核心记忆为：\n{core_memory}\n\n你所扮演的角色介绍如下：\n{system_prompt}"
-        else: character_prompt = f"{base_content}\n\n你所饰演的角色所处世界的世界观为：\n{worldview_content}你所饰演角色所具备的核心记忆为：\n{core_memory}\n\n你所扮演的角色介绍如下：\n{system_prompt}"
+        else:
+            character_prompt = f"{base_content}\n\n你所饰演的角色所处世界的世界观为：\n{worldview_content}你所饰演角色所具备的核心记忆为：\n{core_memory}\n\n你所扮演的角色介绍如下：\n{system_prompt}"
 
         # 构建最终的系统提示词，将时间信息放在最前面
         final_prompt = f"{time_prompt}\n\n{character_prompt}"
@@ -341,7 +345,7 @@ class LLMService:
         last_error = None
         current_model = self.config["model"]
         models_tried = []
-        
+
         logger.info(f"准备发送API请求 - 用户: {user_id}, 模型: {self.config['model']}")
 
         for attempt in range(max_retries):
@@ -382,7 +386,8 @@ class LLMService:
                         raw_content = response_data["message"]["content"]
 
                         # 处理 R1 特殊格式，可能包含 reasoning_content 字段
-                        if isinstance(response_data["message"], dict) and "reasoning_content" in response_data["message"]:
+                        if isinstance(response_data["message"], dict) and "reasoning_content" in response_data[
+                            "message"]:
                             logger.debug("检测到 R1 格式响应，将分离思考内容")
                             # 只使用 content 字段内容，忽略 reasoning_content
                             raw_content = response_data["message"]["content"]
@@ -427,7 +432,7 @@ class LLMService:
 
             except Exception as e:
                 last_error = f"Error: {str(e)}"
-                logger.warning(f"模型 {current_model} API请求失败 (尝试 {attempt+1}/{max_retries}): {str(e)}")
+                logger.warning(f"模型 {current_model} API请求失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
 
                 # 如果启用了自动切换模型且这不是最后一次尝试
                 if self.config["auto_model_switch"] and attempt < max_retries - 1:
@@ -539,7 +544,7 @@ class LLMService:
             Dict: 包含当前配置的字典
         """
         return self.config.copy()  # 返回配置的副本以防止外部修改
-    
+
     def _get_available_models(self) -> List[str]:
         """
         通过API动态获取当前提供商支持的聊天模型列表
@@ -549,47 +554,47 @@ class LLMService:
         """
         try:
             base_url = str(self.client.base_url).lower()
-            
+
             # 特殊处理Ollama
             if 'localhost:11434' in base_url:
                 return [model['id'] for model in self.ollama_models]
-            
+
             # 使用OpenAI标准的v1/models端点获取模型列表
             logger.debug(f"正在从 {self.client.base_url} 获取可用模型列表...")
-            
+
             try:
                 # 使用OpenAI客户端获取模型列表
                 models_response = self.client.models.list()
-                
+
                 # 过滤出聊天模型
                 chat_models = []
                 for model in models_response.data:
                     model_id = model.id
-                    
+
                     # 过滤聊天模型的关键词
                     chat_keywords = [
                         'chat', 'gpt', 'claude', 'deepseek', 'kourichat', 'grok',
                         'llama', 'mistral', 'qwen', 'yi', 'baichuan'
                     ]
-                    
+
                     # 排除非聊天模型的关键词
                     exclude_keywords = [
                         'embedding', 'whisper', 'tts', 'dall-e', 'vision',
                         'moderation', 'edit', 'completion', 'instruct',
                         'image', 'search', 'weblens', 'tool'
                     ]
-                    
+
                     model_lower = model_id.lower()
-                    
+
                     # 检查是否包含聊天关键词且不包含排除关键词
                     is_chat_model = (
-                        any(keyword in model_lower for keyword in chat_keywords) and
-                        not any(keyword in model_lower for keyword in exclude_keywords)
+                            any(keyword in model_lower for keyword in chat_keywords) and
+                            not any(keyword in model_lower for keyword in exclude_keywords)
                     )
-                    
+
                     if is_chat_model:
                         chat_models.append(model_id)
-                
+
                 if chat_models:
                     # 对模型进行优先级排序，DeepSeek系列优先
                     sorted_models = self._sort_models_by_priority(chat_models)
@@ -598,18 +603,18 @@ class LLMService:
                 else:
                     logger.warning("未找到聊天模型，使用当前模型作为唯一选项")
                     return [self.original_model]
-                    
+
             except Exception as api_error:
                 logger.warning(f"通过API获取模型列表失败: {str(api_error)}")
-                
-	                # API调用失败时的后备方案：根据base_url推测可能的模型
+
+                # API调用失败时的后备方案：根据base_url推测可能的模型
                 return self._get_fallback_models(base_url)
-                
+
         except Exception as e:
             logger.error(f"获取可用模型列表失败: {str(e)}")
             # 最终后备方案：只返回当前模型
             return [self.original_model]
-        
+
     def _sort_models_by_priority(self, models: List[str]) -> List[str]:
         """
         按优先级对模型进行排序
@@ -621,10 +626,11 @@ class LLMService:
         Returns:
             List[str]: 按优先级排序后的模型列表
         """
+
         def get_model_priority(model_name: str) -> int:
             """获取模型的优先级数字，数字越小优先级越高"""
             model_lower = model_name.lower()
-            
+
             # Grok系列 - 最高优先级
             if 'grok' in model_lower:
                 if '4' in model_lower:
@@ -640,7 +646,7 @@ class LLMService:
                     return 5  # Grok-1.5 第五优先
                 else:
                     return 6  # 其他 Grok 模型
-            
+
             # DeepSeek系列 - 第二优先级（稳定快速）
             elif 'deepseek' in model_lower:
                 if 'r1' in model_lower or 'reasoner' in model_lower:
@@ -649,7 +655,7 @@ class LLMService:
                     return 8  # DeepSeek V3
                 else:
                     return 9  # 其他 DeepSeek 模型
-            
+
             # KouriChat系列 - 第三优先级
             elif 'kourichat' in model_lower:
                 if 'r1' in model_lower:
@@ -658,7 +664,7 @@ class LLMService:
                     return 11  # KouriChat V3
                 else:
                     return 12  # 其他 KouriChat 模型
-            
+
             # Qwen系列 - 第四优先级
             elif 'qwen' in model_lower:
                 if 'plus' in model_lower:
@@ -667,7 +673,7 @@ class LLMService:
                     return 14  # Qwen Turbo
                 else:
                     return 15  # 其他 Qwen 模型
-            
+
             # GPT系列 - 第五优先级
             elif 'gpt' in model_lower:
                 if '4o' in model_lower:
@@ -678,21 +684,21 @@ class LLMService:
                     return 18  # GPT-5 系列
                 else:
                     return 19  # 其他 GPT 模型
-            
+
             # Claude系列 - 第六优先级（速度较慢）
             elif 'claude' in model_lower:
                 return 20
-            
+
             # 其他模型 - 最低优先级
             else:
                 return 21
-        
+
         # 按优先级排序
         sorted_models = sorted(models, key=get_model_priority)
-        
+
         logger.debug(f"模型优先级排序结果: {sorted_models}")
         return sorted_models
-    
+
     def _get_fallback_models(self, base_url: str) -> List[str]:
         """
         当API调用失败时的后备模型列表
@@ -746,13 +752,13 @@ class LLMService:
 
         current_index = self.available_models.index(current_model)
         next_index = (current_index + 1) % len(self.available_models)
-        
+
         # 如果只有一个模型，返回None表示没有其他模型可用
         if len(self.available_models) == 1:
             return None
-        
+
         # 如果循环回到当前模型，说明已经尝试了所有模型
         if next_index == current_index:
             return None
-            
+
         return self.available_models[next_index]

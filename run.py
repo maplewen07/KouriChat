@@ -62,22 +62,14 @@ def initialize_system():
 
             from src.utils.logger import LoggerConfig
             from src.utils.cleanup import CleanupUtils
-            from src.handlers.image import ImageHandler
             from data.config import config
 
             root_dir = os.path.dirname(src_path)
             logger_config = LoggerConfig(root_dir)
             cleanup_utils = CleanupUtils(root_dir)
-            image_handler = ImageHandler(
-                root_dir=root_dir,
-                api_key=config.llm.api_key,
-                base_url=config.llm.base_url,
-                image_model=config.media.image_generation.model
-            )
 
             logger_config.cleanup_old_logs()
             cleanup_utils.cleanup_all()
-            image_handler.cleanup_temp_dir()
 
             # 清理更新残留文件
             print_status("清理更新残留文件...", "info", "CLEAN")

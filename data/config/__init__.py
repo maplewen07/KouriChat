@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class GroupChatConfigItem:
     id: str
@@ -16,14 +17,12 @@ class GroupChatConfigItem:
     triggers: List[str]
     enable_at_trigger: bool = True  # 默认启用@触发
 
+
 @dataclass
 class UserSettings:
     listen_list: List[str]
-    group_chat_config: List[GroupChatConfigItem] = None
-    
-    def __post_init__(self):
-        if self.group_chat_config is None:
-            self.group_chat_config = []
+    websocket_port: str
+
 
 @dataclass
 class LLMSettings:
@@ -34,6 +33,7 @@ class LLMSettings:
     temperature: float
     auto_model_switch: bool = False
 
+
 @dataclass
 class ImageRecognitionSettings:
     api_key: str
@@ -41,10 +41,12 @@ class ImageRecognitionSettings:
     temperature: float
     model: str
 
+
 @dataclass
 class ImageGenerationSettings:
     model: str
     temp_dir: str
+
 
 @dataclass
 class TextToSpeechSettings:
@@ -52,11 +54,13 @@ class TextToSpeechSettings:
     tts_model_id: str
     voice_dir: str
 
+
 @dataclass
 class MediaSettings:
     image_recognition: ImageRecognitionSettings
     image_generation: ImageGenerationSettings
     text_to_speech: TextToSpeechSettings
+
 
 @dataclass
 class AutoMessageSettings:
@@ -64,19 +68,23 @@ class AutoMessageSettings:
     min_hours: float
     max_hours: float
 
+
 @dataclass
 class QuietTimeSettings:
     start: str
     end: str
+
 
 @dataclass
 class ContextSettings:
     max_groups: int
     avatar_dir: str  # 人设目录路径，prompt文件和表情包目录都将基于此路径
 
+
 @dataclass
 class MessageQueueSettings:
     timeout: int
+
 
 @dataclass
 class TaskSettings:
@@ -87,9 +95,11 @@ class TaskSettings:
     schedule_time: str
     is_active: bool
 
+
 @dataclass
 class ScheduleSettings:
     tasks: List[TaskSettings]
+
 
 @dataclass
 class BehaviorSettings:
@@ -99,9 +109,11 @@ class BehaviorSettings:
     schedule_settings: ScheduleSettings
     message_queue: MessageQueueSettings
 
+
 @dataclass
 class AuthSettings:
     admin_password: str
+
 
 @dataclass
 class NetworkSearchSettings:
@@ -110,12 +122,22 @@ class NetworkSearchSettings:
     api_key: str
     base_url: str
 
+
 @dataclass
 class IntentRecognitionSettings:
     api_key: str
     base_url: str
     model: str
     temperature: float
+
+@dataclass
+class ReplyDecisionSettings:
+    api_key: str
+    base_url: str
+    model: str
+    temperature: float
+    enable: bool
+
 
 @dataclass
 class Config:
@@ -127,6 +149,7 @@ class Config:
         self.auth: AuthSettings
         self.network_search: NetworkSearchSettings
         self.intent_recognition: IntentRecognitionSettings
+        self.reply_decision: ReplyDecisionSettings
         self.version: str = "1.0.0"  # 配置文件版本
         self.load_config()
 
@@ -176,7 +199,7 @@ class Config:
             # 比较当前配置文件和备份文件的内容
             try:
                 with open(self.config_path, 'r', encoding='utf-8') as f1, \
-                     open(backup_path, 'r', encoding='utf-8') as f2:
+                        open(backup_path, 'r', encoding='utf-8') as f2:
                     if f1.read() == f2.read():
                         # 内容相同，无需备份
                         logger.debug("配置未发生变更，跳过备份")
@@ -253,7 +276,8 @@ class Config:
                 old_value = old_template.get(key, {}) if old_template else None
                 result[key] = self.merge_configs(current[key], value, old_value)
             # 如果用户值与旧模板相同，但新模板已更新，则使用新值
-            elif old_template and key in old_template and current[key] == old_template[key] and value != old_template[key]:
+            elif old_template and key in old_template and current[key] == old_template[key] and value != old_template[
+                key]:
                 logger.debug(f"字段 '{key}' 更新为新模板值")
                 result[key] = value
         return result
@@ -373,24 +397,12 @@ class Config:
                 # 确保listen_list是列表类型
                 if not isinstance(listen_list, list):
                     listen_list = [str(listen_list)] if listen_list else []
-                
-                # 群聊配置
-                group_chat_config_data = user_data.get('group_chat_config', {}).get('value', [])
-                group_chat_configs = []
-                if isinstance(group_chat_config_data, list):
-                    for config_item in group_chat_config_data:
-                        if isinstance(config_item, dict) and all(key in config_item for key in ['id', 'groupName', 'avatar', 'triggers']):
-                            group_chat_configs.append(GroupChatConfigItem(
-                                id=config_item['id'],
-                                group_name=config_item['groupName'],
-                                avatar=config_item['avatar'],
-                                triggers=config_item.get('triggers', []),
-                                enable_at_trigger=config_item.get('enableAtTrigger', True)  # 默认启用@触发
-                            ))
-                
+
+                websocket_port = user_data['websocket_port'].get('value', [])
+
                 self.user = UserSettings(
                     listen_list=listen_list,
-                    group_chat_config=group_chat_configs
+                    websocket_port=websocket_port
                 )
 
                 # LLM设置
@@ -402,30 +414,6 @@ class Config:
                     max_tokens=int(llm_data['max_tokens'].get('value', 0)),
                     temperature=float(llm_data['temperature'].get('value', 0)),
                     auto_model_switch=bool(llm_data['auto_model_switch'].get('value', False))
-                )
-
-                # 媒体设置
-                media_data = categories['media_settings']['settings']
-                image_recognition_data = media_data['image_recognition']
-                image_generation_data = media_data['image_generation']
-                text_to_speech_data = media_data['text_to_speech']
-
-                self.media = MediaSettings(
-                    image_recognition=ImageRecognitionSettings(
-                        api_key=image_recognition_data['api_key'].get('value', ''),
-                        base_url=image_recognition_data['base_url'].get('value', ''),
-                        temperature=float(image_recognition_data['temperature'].get('value', 0)),
-                        model=image_recognition_data['model'].get('value', '')
-                    ),
-                    image_generation=ImageGenerationSettings(
-                        model=image_generation_data['model'].get('value', ''),
-                        temp_dir=image_generation_data['temp_dir'].get('value', '')
-                    ),
-                    text_to_speech=TextToSpeechSettings(
-                        tts_api_key=text_to_speech_data['tts_api_key'].get('value', ''),
-                        tts_model_id=text_to_speech_data['tts_model_id'].get('value', ''),
-                        voice_dir=text_to_speech_data['voice_dir'].get('value', '')
-                    )
                 )
 
                 # 行为设置
@@ -452,7 +440,8 @@ class Config:
                         tasks_data = schedule_data['settings']['tasks'].get('value', [])
                         for task in tasks_data:
                             # 确保必要的字段存在
-                            if all(key in task for key in ['task_id', 'chat_id', 'content', 'schedule_type', 'schedule_time']):
+                            if all(key in task for key in
+                                   ['task_id', 'chat_id', 'content', 'schedule_type', 'schedule_time']):
                                 schedule_tasks.append(TaskSettings(
                                     task_id=task['task_id'],
                                     chat_id=task['chat_id'],
@@ -509,7 +498,17 @@ class Config:
                     temperature=float(intent_recognition_data.get('temperature', {}).get('value', 0.1))
                 )
 
-                logger.info("配置加载完成")
+                # 回复判断API配置
+                reply_decision_data = categories.get('reply_decision_settings', {}).get('settings', {})
+                self.reply_decision = ReplyDecisionSettings(
+                    api_key=reply_decision_data.get('api_key', {}).get('value', ''),
+                    base_url=reply_decision_data.get('base_url', {}).get('value', 'https://api.kourichat.com/v1'),
+                    model=reply_decision_data.get('model', {}).get('value', 'reply-decision-v1'),
+                    temperature=float(reply_decision_data.get('temperature', {}).get('value', 0.1)),
+                    enable = bool(reply_decision_data.get('enable', {}).get('value', True))
+                )
+
+            logger.info("配置加载完成")
 
         except Exception as e:
             logger.error(f"加载配置失败: {str(e)}")
@@ -534,24 +533,17 @@ class Config:
             logger.error(f"更新密码失败: {str(e)}")
             return False
 
+
 # 创建全局配置实例
 config = Config()
 
 # 为了兼容性保留的旧变量（将在未来版本中移除）
-LISTEN_LIST = config.user.listen_list
 DEEPSEEK_API_KEY = config.llm.api_key
 DEEPSEEK_BASE_URL = config.llm.base_url
 MODEL = config.llm.model
 MAX_TOKEN = config.llm.max_tokens
 TEMPERATURE = config.llm.temperature
-VISION_API_KEY = config.media.image_recognition.api_key
-VISION_BASE_URL = config.media.image_recognition.base_url
-VISION_TEMPERATURE = config.media.image_recognition.temperature
-IMAGE_MODEL = config.media.image_generation.model
-TEMP_IMAGE_DIR = config.media.image_generation.temp_dir
 MAX_GROUPS = config.behavior.context.max_groups
-#TTS_API_URL = config.media.text_to_speech.tts_api_key
-VOICE_DIR = config.media.text_to_speech.voice_dir
 AUTO_MESSAGE = config.behavior.auto_message.content
 MIN_COUNTDOWN_HOURS = config.behavior.auto_message.min_hours
 MAX_COUNTDOWN_HOURS = config.behavior.auto_message.max_hours

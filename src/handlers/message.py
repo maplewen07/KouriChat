@@ -11,7 +11,8 @@ import threading
 import time
 import re
 from datetime import datetime
-from wxauto import WeChat
+
+from modules.recognition.conversation_state_recognition import ConversationStateRecognitionService
 from src.services.database import Session, ChatMessage
 import random
 import os
@@ -30,7 +31,7 @@ logger = logging.getLogger('main')
 
 
 class MessageHandler:
-    def __init__(self, root_dir, api_key, base_url, model, max_token, temperature,
+    def __init__(self, ws_sender, root_dir, api_key, base_url, model, max_token, temperature,
                  max_groups, robot_name, prompt_content, image_handler, emoji_handler, memory_service,
                  content_generator=None):
         self.root_dir = root_dir
@@ -64,7 +65,8 @@ class MessageHandler:
         self.chat_contexts = {}
 
         # 微信实例
-        self.wx = WeChat()
+        # @Todo 连接 Socket
+        self.ws_sender = ws_sender
 
         # 添加 handlers
         self.image_handler = image_handler
@@ -116,6 +118,9 @@ class MessageHandler:
         self.remind_request_recognitor = ReminderRecognitionService(self.deepseek)
         self.search_request_recognitor = SearchRecognitionService(self.deepseek)
         logger.info("意图识别服务已初始化")
+
+        self.conversation_state_recognitor = ConversationStateRecognitionService(self.deepseek)
+        logger.info("回复判断服务已初始化")
 
         # 初始化提醒服务（传入自身实例）
         from modules.reminder import ReminderService
@@ -694,59 +699,24 @@ class MessageHandler:
         reply = self._process_text_for_display(reply)
 
         if '$' in reply or '＄' in reply:
+
             parts = [p.strip() for p in reply.replace("＄", "$").split("$") if p.strip()]
 
             for part in parts:
-                # 检查当前部分是否包含表情标签
-                emotion_tags = self.emoji_handler.extract_emotion_tags(part)
-                if emotion_tags:
-                    logger.debug(f"消息片段包含表情: {emotion_tags}")
-
-                # 清理表情标签并发送文本
                 clean_part = part
-                for tag in emotion_tags:
-                    clean_part = clean_part.replace(f'[{tag}]', '')
 
                 if clean_part.strip():
-                    self.wx.SendMsg(msg=clean_part.strip(), who=chat_id)
+                    self.ws_sender.send_text(chat_id=chat_id, content=clean_part.strip(), sender=self.current_avatar)
                     logger.debug(f"发送消息: {clean_part[:20]}...")
-
-                # 发送该部分包含的表情
-                for emotion_type in emotion_tags:
-                    try:
-                        emoji_path = self.emoji_handler.get_emoji_for_emotion(emotion_type)
-                        if emoji_path:
-                            self.wx.SendFiles(filepath=emoji_path, who=chat_id)
-                            logger.debug(f"已发送表情: {emotion_type}")
-                            time.sleep(random.randint(1, 3))
-                    except Exception as e:
-                        logger.error(f"发送表情失败 - {emotion_type}: {str(e)}")
 
                 time.sleep(random.randint(4, 8))
         else:
-            # 处理不包含分隔符的消息
-            emotion_tags = self.emoji_handler.extract_emotion_tags(reply)
-            if emotion_tags:
-                logger.debug(f"消息包含表情: {emotion_tags}")
 
             clean_reply = reply
-            for tag in emotion_tags:
-                clean_reply = clean_reply.replace(f'[{tag}]', '')
 
             if clean_reply.strip():
-                self.wx.SendMsg(msg=clean_reply.strip(), who=chat_id)
+                self.ws_sender.send_text(chat_id=chat_id, content=clean_reply.strip(), sender=self.current_avatar)
                 logger.debug(f"发送消息: {clean_reply[:20]}...")
-
-            # 发送表情
-            for emotion_type in emotion_tags:
-                try:
-                    emoji_path = self.emoji_handler.get_emoji_for_emotion(emotion_type)
-                    if emoji_path:
-                        self.wx.SendFiles(filepath=emoji_path, who=chat_id)
-                        logger.debug(f"已发送表情: {emotion_type}")
-                        time.sleep(random.randint(1, 3))
-                except Exception as e:
-                    logger.error(f"发送表情失败 - {emotion_type}: {str(e)}")
 
     def _send_raw_message(self, text: str, chat_id: str):
         """直接发送原始文本消息，保留所有换行符和格式
@@ -762,13 +732,7 @@ class MessageHandler:
             # 只处理表情符号，不做其他格式处理
             text = self._process_text_for_display(text)
 
-            # 提取表情标签
-            emotion_tags = self.emoji_handler.extract_emotion_tags(text)
-
-            # 清理表情标签
             clean_text = text
-            for tag in emotion_tags:
-                clean_text = clean_text.replace(f'[{tag}]', '')
 
             # 直接发送消息，只做必要的处理
             if clean_text:
@@ -776,8 +740,8 @@ class MessageHandler:
                 clean_text = clean_text.replace('＄', '')  # 全角$符号
                 clean_text = clean_text.replace(r'\n', '\r\n\r\n')
                 # logger.info(clean_text)
-                self.wx.SendMsg(msg=clean_text, who=chat_id)
-                
+                self.ws_sender.send_text(chat_id=chat_id, content=clean_text, sender=self.current_avatar)
+
                 # logger.info(f"已发送经过处理的文件内容: {file_content}")
 
         except Exception as e:
@@ -811,42 +775,81 @@ class MessageHandler:
             command = content.split(' ')[0].lower()
             logger.debug(f"检测到命令: {command}")
 
-        # 对于群聊消息，使用不暗示@的格式
-        if is_group:
-            api_content = f"[群聊消息] {sender_name}: {content}"
-        else:
-            api_content = content
+        api_content = content
 
-        reply = self.get_api_response(api_content, chat_id, is_group)
-        logger.info(f"AI回复: {reply}")
-
-        # 处理回复中的思考过程
-        if "</think>" in reply:
-            think_content, reply = reply.split("</think>", 1)
-            logger.debug(f"思考过程: {think_content.strip()}")
-
-        # 处理群聊中的回复
-        reply = self._add_at_tag_if_needed(reply, sender_name, is_group)
+        reply = ""
 
         # 判断是否是系统消息
-        is_system_message = sender_name == "System" or username == "System"
+        is_system_message = sender_name == "System" or sender_name.lower() == "system" or username == "System"
 
-        # 发送文本消息和表情
-        if command and command in self.preserve_format_commands:
-            # 如果是需要保留原始格式的命令，使用原始格式发送
-            self._send_command_response(command, reply, chat_id)
-        else:
-            # 否则使用正常的消息发送方式
-            self._send_message_with_dollar(reply, chat_id)
+        # 在获取AI回复之前，先进行对话状态分析（仅对非系统消息和非命令消息）
+        should_reply = True
+        conversation_state = None
 
-        # 异步保存消息记录
-        # 保存实际用户发送的内容，群聊中保留发送者信息
-        save_content = api_content if is_group else content
-        threading.Thread(target=self.save_message,
-                         args=(chat_id, sender_name, save_content, reply, is_system_message)).start()
-        if is_system_message:
+        # 检查是否启用对话状态识别
+        enable_reply_recognition = getattr(config.reply_decision, 'enable', True)
+
+        if enable_reply_recognition and not is_system_message and not command:
+            try:
+                # 获取最近的对话历史用于状态分析
+                recent_context = self._get_recent_context_for_state_analysis(chat_id, api_content)
+
+                if recent_context and len(recent_context) >= 2:  # 至少需要2条消息才能判断状态
+                    logger.info("开始对话状态分析...")
+                    conversation_state = self.conversation_state_recognitor.recognize(recent_context)
+
+                    if conversation_state:
+                        logger.info(f"对话状态: {conversation_state['state']}, "
+                                    f"置信度: {conversation_state['confidence']:.2f}, "
+                                    f"理由: {conversation_state['reason']}")
+
+                        should_reply = conversation_state['should_reply']
+
+                        if not should_reply:
+                            logger.info("根据对话状态分析，本次不发送回复")
+                            # 仍然保存用户消息到记忆中，但不生成回复
+                            save_content = api_content if is_group else content
+                            threading.Thread(target=self.save_message,
+                                             args=(chat_id, sender_name, save_content, "", is_system_message)).start()
+                            return None
+
+                        # 如果是ENDED状态但需要回复（如晚安），生成简短的告别回复
+                        if conversation_state['state'] == 'ENDED' and should_reply:
+                            logger.info("对话已结束，生成简短告别回复")
+                            # 可以在这里添加特殊的系统提示，让AI生成简短告别
+
+            except Exception as e:
+                logger.error(f"对话状态分析失败: {str(e)}, 继续正常处理")
+                should_reply = True
+
+        # 只有在应该回复时才获取AI响应
+        if should_reply:
+            reply = self.get_api_response(api_content, chat_id, is_group)
+            logger.info(f"AI回复: {reply}")
+
+            # 处理回复中的思考过程
+            if "</think>" in reply:
+                think_content, reply = reply.split("</think>", 1)
+                logger.debug(f"思考过程: {think_content.strip()}")
+
+            # 处理群聊中的回复
+            reply = self._add_at_tag_if_needed(reply, sender_name, is_group)
+
+            # 发送文本消息和表情
+            if command and command in self.preserve_format_commands:
+                # 如果是需要保留原始格式的命令，使用原始格式发送
+                self._send_command_response(command, reply, chat_id)
+            else:
+                # 否则使用正常的消息发送方式
+                self._send_message_with_dollar(reply, chat_id)
+
+            # 异步保存消息记录
+            # 保存实际用户发送的内容，群聊中保留发送者信息
+            save_content = api_content if is_group else content
             threading.Thread(target=self.save_message,
-                             args=(chat_id, chat_id, "……", reply, False)).start()
+                             args=(chat_id, sender_name, save_content, reply, is_system_message)).start()
+            if is_system_message:
+                threading.Thread(target=self.save_message, args=(chat_id, chat_id, "……", reply, False)).start()
         return reply
 
     def _add_to_system_prompt(self, chat_id: str, content: str) -> None:
@@ -1030,3 +1033,37 @@ class MessageHandler:
         # 该方法不再使用，保留以兼容旧代码
         logger.warning("process_messages方法已废弃，使用handle_message代替")
         pass
+
+    def _get_recent_context_for_state_analysis(self, chat_id, current_message):
+        """
+        获取用于对话状态分析的最近对话历史
+        Args:
+            chat_id: 聊天ID
+            current_message: 当前消息
+        Returns:
+            list: 最近的对话消息列表，格式为 [{"role": "user/assistant", "content": "..."}]
+        """
+        try:
+            # 从LLM服务的上下文中获取最近的对话
+            if chat_id in self.deepseek.chat_contexts:
+                context = self.deepseek.chat_contexts[chat_id]
+                # 过滤掉系统消息，只保留用户和助手的对话
+                filtered_context = [
+                    msg for msg in context
+                    if msg.get("role") in ["user", "assistant"]
+                ]
+
+                # 添加当前消息
+                filtered_context.append({
+                    "role": "user",
+                    "content": current_message
+                })
+
+                return filtered_context[-5:]  # 返回最近5条消息
+            else:
+                # 如果没有上下文，只返回当前消息
+                return [{"role": "user", "content": current_message}]
+
+        except Exception as e:
+            logger.error(f"获取对话历史失败: {str(e)}")
+            return [{"role": "user", "content": current_message}]

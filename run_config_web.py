@@ -20,8 +20,6 @@ from typing import Dict, Any, List
 import psutil
 import subprocess
 import threading
-from src.autoupdate.updater import Updater
-import requests
 import time
 from queue import Queue
 import datetime
@@ -37,7 +35,6 @@ from datetime import timedelta
 from src.utils.console import print_status
 from src.avatar_manager import avatar_manager  # 导入角色设定管理器
 from src.webui.routes.avatar import avatar_bp
-import ctypes
 import win32api
 import win32con
 import win32job
@@ -105,8 +102,8 @@ os.makedirs(os.path.join(static_dir, 'js'), exist_ok=True)
 os.makedirs(os.path.join(static_dir, 'css'), exist_ok=True)
 
 app = Flask(__name__,
-    template_folder=templates_dir,
-    static_folder=static_dir)
+            template_folder=templates_dir,
+            static_folder=static_dir)
 
 # 添加配置
 app.config['UPLOAD_FOLDER'] = os.path.join(ROOT_DIR, 'src/webui/background_image')
@@ -128,6 +125,7 @@ except Exception as e:
 # 导入更新器中的常量
 from src.autoupdate.updater import Updater
 
+
 # 在应用启动时检查云端更新和公告
 def check_cloud_updates_on_startup():
     try:
@@ -135,26 +133,28 @@ def check_cloud_updates_on_startup():
         logger.info("应用启动时检查云端更新...")
         check_cloud_info()
         logger.info("云端更新检查完成")
-        
+
         # 触发公告处理但不显示桌面弹窗
         try:
             from src.autoupdate.core.manager import get_manager
-            
+
             # 触发更新检查和公告处理
             manager = get_manager()
             manager.check_and_process_updates()
             logger.info("公告数据处理完成，将在Web页面显示")
-                
+
         except Exception as announcement_error:
             logger.error(f"公告处理失败: {announcement_error}")
-            
+
     except Exception as e:
         logger.error(f"检查云端更新失败: {e}")
+
 
 # 启动一个后台线程来检查云端更新
 update_thread = threading.Thread(target=check_cloud_updates_on_startup)
 update_thread.daemon = True
 update_thread.start()
+
 
 def get_available_avatars() -> List[str]:
     """获取可用的人设目录列表"""
@@ -179,7 +179,10 @@ def get_available_avatars() -> List[str]:
 
             if not os.path.exists(avatar_md_path):
                 with open(avatar_md_path, 'w', encoding='utf-8') as f:
-                    f.write("# 任务\n请在此处描述角色的任务和目标\n\n# 角色\n请在此处描述角色的基本信息\n\n# 外表\n请在此处描述角色的外表特征\n\n# 经历\n请在此处描述角色的经历和背景故事\n\n# 性格\n请在此处描述角色的性格特点\n\n# 经典台词\n请在此处列出角色的经典台词\n\n# 喜好\n请在此处描述角色的喜好\n\n# 备注\n其他需要补充的信息")
+                    f.write(
+                        "# 任务\n请在此处描述角色的任务和目标\n\n# 角色\n请在此处描述角色的基本信息\n\n# 外表\n请在此处描述角色的外表特征\n\n# "
+                        "经历\n请在此处描述角色的经历和背景故事\n\n# 性格\n请在此处描述角色的性格特点\n\n# 经典台词\n请在此处列出角色的经典台词\n\n# "
+                        "喜好\n请在此处描述角色的喜好\n\n# 备注\n其他需要补充的信息")
                 logger.info(f"为人设 {item} 创建模板avatar.md文件")
 
             # 检查文件和目录是否存在
@@ -195,12 +198,16 @@ def get_available_avatars() -> List[str]:
 
         # 创建默认人设文件
         with open(os.path.join(default_dir, "avatar.md"), 'w', encoding='utf-8') as f:
-            f.write("# 任务\n作为一个温柔体贴的虚拟助手，为用户提供陪伴和帮助\n\n# 角色\n名字: MONO\n身份: AI助手\n\n# 外表\n清新甜美的少女形象\n\n# 经历\n被创造出来陪伴用户\n\n# 性格\n温柔、体贴、善解人意\n\n# 经典台词\n\"我会一直陪着你的~\"\n\"今天过得怎么样呀？\"\n\"需要我做什么呢？\"\n\n# 喜好\n喜欢和用户聊天\n喜欢分享知识\n\n# 备注\n默认人设")
+            f.write(
+                "# 任务\n作为一个温柔体贴的虚拟助手，为用户提供陪伴和帮助\n\n# 角色\n名字: MONO\n身份: AI助手\n\n# 外表\n清新甜美的少女形象\n\n# "
+                "经历\n被创造出来陪伴用户\n\n# 性格\n温柔、体贴、善解人意\n\n# 经典台词\n\"我会一直陪着你的~\"\n\"今天过得怎么样呀？\"\n\"需要我做什么呢？\"\n\n# "
+                "喜好\n喜欢和用户聊天\n喜欢分享知识\n\n# 备注\n默认人设")
 
         avatars.append(f"data/avatars/{default_avatar}")
         logger.info("创建了默认人设 MONO")
 
     return avatars
+
 
 def parse_config_groups() -> Dict[str, Dict[str, Any]]:
     """解析配置文件，将配置项按组分类"""
@@ -210,34 +217,26 @@ def parse_config_groups() -> Dict[str, Dict[str, Any]]:
         # 基础配置组
         config_groups = {
             "基础配置": {},
-            "TTS 服务配置": {},
-            "图像识别API配置": {},
             "意图识别API配置": {},
+            "回复判断API配置": {},
             "主动消息配置": {},
             "消息配置": {},
             "人设配置": {},
             "网络搜索配置": {},
-            "世界书":{}
+            "世界书": {}
         }
 
         # 基础配置
         config_groups["基础配置"].update(
             {
+                # 添加LISTEN_LIST配置项
                 "LISTEN_LIST": {
                     "value": config.user.listen_list,
-                    "description": "用户列表(请配置要和bot说话的账号的昵称或者群名，不要写备注！昵称尽量别用特殊字符)",
+                    "description": "监听列表，多个值用逗号分隔"
                 },
-                "GROUP_CHAT_CONFIG": {
-                    "value": [
-                        {
-                            "id": item.id,
-                            "groupName": item.group_name,
-                            "avatar": item.avatar,
-                            "triggers": item.triggers,
-                            "enableAtTrigger": item.enable_at_trigger
-                        } for item in config.user.group_chat_config
-                    ],
-                    "description": "群聊配置列表（为不同群聊配置专用人设和触发词）",
+                "WEBSOCKET_PORT": {
+                    "value": config.user.websocket_port,
+                    "description": "WebSocket服务器端口"
                 },
                 "DEEPSEEK_BASE_URL": {
                     "value": config.llm.base_url,
@@ -264,48 +263,6 @@ def parse_config_groups() -> Dict[str, Dict[str, Any]]:
                     "value": config.llm.auto_model_switch,
                     "type": "boolean",
                     "description": "自动切换模型"
-                },
-            }
-        )
-
-        # TTS 服务配置
-        config_groups["TTS 服务配置"].update(
-            {
-                "TTS_API_KEY":{
-                    "value":config.media.text_to_speech.tts_api_key,
-                    "description": "Fish Audio API 密钥"
-                },
-                "TTS_MODEL_ID":{
-                    "value":config.media.text_to_speech.tts_model_id,
-                    "description": "进行 TTS 的模型 ID"
-                }
-            }
-        )
-
-        # 图像识别API配置
-        config_groups["图像识别API配置"].update(
-            {
-                "VISION_BASE_URL": {
-                    "value": config.media.image_recognition.base_url,
-                    "description": "服务地址",
-                    "has_provider_options": True
-                },
-                "VISION_API_KEY": {
-                    "value": config.media.image_recognition.api_key,
-                    "description": "API密钥",
-                    "is_secret": False
-                },
-                "VISION_MODEL": {
-                    "value": config.media.image_recognition.model,
-                    "description": "模型名称",
-                    "has_model_options": True
-                },
-                "VISION_TEMPERATURE": {
-                    "value": float(config.media.image_recognition.temperature),
-                    "description": "温度参数",
-                    "type": "number",
-                    "min": 0.0,
-                    "max": 1.0
                 }
             }
         )
@@ -334,6 +291,39 @@ def parse_config_groups() -> Dict[str, Dict[str, Any]]:
                     "type": "number",
                     "min": 0.0,
                     "max": 1.0
+                }
+            }
+        )
+
+        # 回复判断API配置
+        config_groups["回复判断API配置"].update(
+            {
+                "REPLY_DECISION_BASE_URL": {
+                    "value": config.reply_decision.base_url,
+                    "description": "回复判断 API 地址",
+                    "has_provider_options": True
+                },
+                "REPLY_DECISION_API_KEY": {
+                    "value": config.reply_decision.api_key,
+                    "description": "API密钥",
+                    "is_secret": False
+                },
+                "REPLY_DECISION_MODEL": {
+                    "value": config.reply_decision.model,
+                    "description": "使用的模型",
+                    "has_model_options": True
+                },
+                "REPLY_DECISION_TEMPERATURE": {
+                    "value": float(config.reply_decision.temperature),
+                    "description": "温度参数",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0
+                },
+                "REPLY_DECISION_ENABLE": {
+                    "value": config.reply_decision.enable,
+                    "description": "启用对话状态识别（智能判断是否需要回复）",
+                    "type": "boolean"
                 }
             }
         )
@@ -429,7 +419,7 @@ def parse_config_groups() -> Dict[str, Dict[str, Any]]:
                 worldview = f.read()
         except Exception as e:
             logger.error(f"读取世界观失败: {str(e)}")
-        
+
         config_groups['世界书'] = {
             'worldview': {
                 'value': worldview,
@@ -445,7 +435,8 @@ def parse_config_groups() -> Dict[str, Dict[str, Any]]:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
                 if 'categories' in config_data and 'schedule_settings' in config_data['categories']:
-                    if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in config_data['categories']['schedule_settings']['settings']:
+                    if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in \
+                            config_data['categories']['schedule_settings']['settings']:
                         tasks = config_data['categories']['schedule_settings']['settings']['tasks'].get('value', [])
         except Exception as e:
             logger.error(f"读取任务数据失败: {str(e)}")
@@ -468,11 +459,11 @@ def parse_config_groups() -> Dict[str, Dict[str, Any]]:
         return {}
 
 
-
 @app.route('/')
 def index():
     """重定向到控制台"""
     return redirect(url_for('dashboard'))
+
 
 def load_config_file():
     """从配置文件加载配置数据"""
@@ -482,6 +473,7 @@ def load_config_file():
     except Exception as e:
         logger.error(f"加载配置失败: {str(e)}")
         return {"categories": {}}
+
 
 def save_config_file(config_data):
     """保存配置数据到配置文件"""
@@ -493,6 +485,7 @@ def save_config_file(config_data):
         logger.error(f"保存配置失败: {str(e)}")
         return False
 
+
 def reinitialize_tasks():
     """重新初始化定时任务"""
     try:
@@ -503,6 +496,7 @@ def reinitialize_tasks():
     except Exception as e:
         logger.error(f"更新任务配置失败: {str(e)}")
         return False
+
 
 @app.route('/save', methods=['POST'])
 def save_config():
@@ -562,12 +556,17 @@ def save_config():
                         "title": "错误"
                     }), 400
             # 处理其他配置项
-            elif key in ['LISTEN_LIST', 'GROUP_CHAT_CONFIG', 'DEEPSEEK_BASE_URL', 'MODEL', 'DEEPSEEK_API_KEY', 'MAX_TOKEN', 'TEMPERATURE','AUTO_MODEL_SWITCH',
-                       'VISION_API_KEY', 'VISION_BASE_URL', 'VISION_TEMPERATURE', 'VISION_MODEL',
-                       'INTENT_API_KEY', 'INTENT_BASE_URL', 'INTENT_MODEL', 'INTENT_TEMPERATURE',
-                       'IMAGE_MODEL', 'TEMP_IMAGE_DIR', 'AUTO_MESSAGE', 'MIN_COUNTDOWN_HOURS', 'MAX_COUNTDOWN_HOURS',
-                       'QUIET_TIME_START', 'QUIET_TIME_END', 'TTS_API_URL', 'VOICE_DIR', 'MAX_GROUPS', 'AVATAR_DIR',
-                       'QUEUE_TIMEOUT', 'NETWORK_SEARCH_ENABLED', 'WEBLENS_ENABLED', 'NETWORK_SEARCH_API_KEY', 'NETWORK_SEARCH_BASE_URL', 'TTS_API_KEY', 'TTS_MODEL_ID']:
+            elif key in ['LISTEN_LIST', 'WEBSOCKET_PORT', 'DEEPSEEK_BASE_URL', 'MODEL', 'DEEPSEEK_API_KEY',
+                         'MAX_TOKEN', 'TEMPERATURE', 'AUTO_MODEL_SWITCH',
+                         'VISION_API_KEY', 'VISION_BASE_URL', 'VISION_TEMPERATURE', 'VISION_MODEL',
+                         'INTENT_API_KEY', 'INTENT_BASE_URL', 'INTENT_MODEL', 'INTENT_TEMPERATURE',
+                         'REPLY_DECISION_API_KEY', 'REPLY_DECISION_BASE_URL', 'REPLY_DECISION_MODEL',
+                         'REPLY_DECISION_TEMPERATURE', 'REPLY_DECISION_ENABLE'
+                                                       'IMAGE_MODEL', 'TEMP_IMAGE_DIR', 'AUTO_MESSAGE',
+                         'MIN_COUNTDOWN_HOURS', 'MAX_COUNTDOWN_HOURS',
+                         'QUIET_TIME_START', 'QUIET_TIME_END', 'TTS_API_URL', 'VOICE_DIR', 'MAX_GROUPS', 'AVATAR_DIR',
+                         'QUEUE_TIMEOUT', 'NETWORK_SEARCH_ENABLED', 'WEBLENS_ENABLED', 'NETWORK_SEARCH_API_KEY',
+                         'NETWORK_SEARCH_BASE_URL', 'TTS_API_KEY', 'TTS_MODEL_ID']:
                 update_config_value(current_config, key, value)
             elif key == 'WORLDVIEW':
                 worldview_file_path = os.path.join(ROOT_DIR, 'src/base/worldview.md')
@@ -587,6 +586,14 @@ def save_config():
                 "title": "错误"
             }), 500
 
+        try:
+            import importlib
+            import data.config as config_module
+            importlib.reload(config_module)
+            logger.info("配置模块 data.config 已重新加载")
+        except Exception as e:
+            logger.error(f"重新加载配置模块失败: {e}")
+
         # 立即重新加载配置
         g.config_data = current_config
 
@@ -604,13 +611,14 @@ def save_config():
             "title": "错误"
         }), 500
 
+
 def update_config_value(config_data, key, value):
     """更新配置值到正确的位置"""
     try:
         # 配置项映射表 - 修正路径以匹配实际配置结构
         mapping = {
             'LISTEN_LIST': ['categories', 'user_settings', 'settings', 'listen_list', 'value'],
-            'GROUP_CHAT_CONFIG': ['categories', 'user_settings', 'settings', 'group_chat_config', 'value'],
+            'WEBSOCKET_PORT': ['categories', 'user_settings', 'settings', 'websocket_port', 'value'],
             'DEEPSEEK_BASE_URL': ['categories', 'llm_settings', 'settings', 'base_url', 'value'],
             'MODEL': ['categories', 'llm_settings', 'settings', 'model', 'value'],
             'DEEPSEEK_API_KEY': ['categories', 'llm_settings', 'settings', 'api_key', 'value'],
@@ -625,19 +633,28 @@ def update_config_value(config_data, key, value):
             'TTS_API_KEY': ['categories', 'media_settings', 'settings', 'text_to_speech', 'tts_api_key', 'value'],
             'TTS_MODEL_ID': ['categories', 'media_settings', 'settings', 'text_to_speech', 'tts_model_id', 'value'],
             'VISION_BASE_URL': ['categories', 'media_settings', 'settings', 'image_recognition', 'base_url', 'value'],
-            'VISION_TEMPERATURE': ['categories', 'media_settings', 'settings', 'image_recognition', 'temperature', 'value'],
+            'VISION_TEMPERATURE': ['categories', 'media_settings', 'settings', 'image_recognition', 'temperature',
+                                   'value'],
             'VISION_MODEL': ['categories', 'media_settings', 'settings', 'image_recognition', 'model', 'value'],
             'INTENT_API_KEY': ['categories', 'intent_recognition_settings', 'settings', 'api_key', 'value'],
             'INTENT_BASE_URL': ['categories', 'intent_recognition_settings', 'settings', 'base_url', 'value'],
             'INTENT_MODEL': ['categories', 'intent_recognition_settings', 'settings', 'model', 'value'],
             'INTENT_TEMPERATURE': ['categories', 'intent_recognition_settings', 'settings', 'temperature', 'value'],
+            'REPLY_DECISION_API_KEY': ['categories', 'reply_decision_settings', 'settings', 'api_key', 'value'],
+            'REPLY_DECISION_BASE_URL': ['categories', 'reply_decision_settings', 'settings', 'base_url', 'value'],
+            'REPLY_DECISION_MODEL': ['categories', 'reply_decision_settings', 'settings', 'model', 'value'],
+            'REPLY_DECISION_TEMPERATURE': ['categories', 'reply_decision_settings', 'settings', 'temperature', 'value'],
+            'REPLY_DECISION_ENABLE': ['categories', 'reply_decision_settings', 'settings', 'enable', 'value'],
+
             'IMAGE_MODEL': ['categories', 'media_settings', 'settings', 'image_generation', 'model', 'value'],
             'TEMP_IMAGE_DIR': ['categories', 'media_settings', 'settings', 'image_generation', 'temp_dir', 'value'],
             'TTS_API_URL': ['categories', 'media_settings', 'settings', 'text_to_speech', 'tts_api_url', 'value'],
             'VOICE_DIR': ['categories', 'media_settings', 'settings', 'text_to_speech', 'voice_dir', 'value'],
             'AUTO_MESSAGE': ['categories', 'behavior_settings', 'settings', 'auto_message', 'content', 'value'],
-            'MIN_COUNTDOWN_HOURS': ['categories', 'behavior_settings', 'settings', 'auto_message', 'countdown', 'min_hours', 'value'],
-            'MAX_COUNTDOWN_HOURS': ['categories', 'behavior_settings', 'settings', 'auto_message', 'countdown', 'max_hours', 'value'],
+            'MIN_COUNTDOWN_HOURS': ['categories', 'behavior_settings', 'settings', 'auto_message', 'countdown',
+                                    'min_hours', 'value'],
+            'MAX_COUNTDOWN_HOURS': ['categories', 'behavior_settings', 'settings', 'auto_message', 'countdown',
+                                    'max_hours', 'value'],
             'QUIET_TIME_START': ['categories', 'behavior_settings', 'settings', 'quiet_time', 'start', 'value'],
             'QUIET_TIME_END': ['categories', 'behavior_settings', 'settings', 'quiet_time', 'end', 'value'],
             'QUEUE_TIMEOUT': ['categories', 'behavior_settings', 'settings', 'message_queue', 'timeout', 'value'],
@@ -653,19 +670,10 @@ def update_config_value(config_data, key, value):
             if key == 'LISTEN_LIST' and isinstance(value, str):
                 value = value.split(',')
                 value = [item.strip() for item in value if item.strip()]
-            
-            # 特殊处理 GROUP_CHAT_CONFIG，确保它是正确的列表格式
-            elif key == 'GROUP_CHAT_CONFIG':
-                if isinstance(value, str):
-                    try:
-                        value = json.loads(value)
-                    except:
-                        value = []
-                elif not isinstance(value, list):
-                    value = []
 
             # 特殊处理API相关配置
-            if key in ['DEEPSEEK_BASE_URL', 'MODEL', 'DEEPSEEK_API_KEY', 'MAX_TOKEN', 'TEMPERATURE', 'AUTO_MODEL_SWITCH']:
+            if key in ['DEEPSEEK_BASE_URL', 'MODEL', 'DEEPSEEK_API_KEY', 'MAX_TOKEN', 'TEMPERATURE',
+                       'AUTO_MODEL_SWITCH']:
                 # 确保llm_settings结构存在
                 if 'categories' not in current:
                     current['categories'] = {}
@@ -686,12 +694,13 @@ def update_config_value(config_data, key, value):
                 elif key == 'TEMPERATURE':
                     current['categories']['llm_settings']['settings']['temperature'] = {'value': value}
                 elif key == 'AUTO_MODEL_SWITCH':
-                    current['categories']['llm_settings']['settings']['auto_model_switch'] = {'value': True if value == 'on' else False, 'type': 'boolean'}
+                    current['categories']['llm_settings']['settings']['auto_model_switch'] = {
+                        'value': True if value == 'on' else False, 'type': 'boolean'}
                 return
 
             # 特殊处理网络搜索相关配置
             elif key in ['NETWORK_SEARCH_ENABLED', 'WEBLENS_ENABLED',
-                        'NETWORK_SEARCH_API_KEY', 'NETWORK_SEARCH_BASE_URL']:
+                         'NETWORK_SEARCH_API_KEY', 'NETWORK_SEARCH_BASE_URL']:
                 # 确保network_search_settings结构存在
                 if 'categories' not in current:
                     current['categories'] = {}
@@ -702,15 +711,17 @@ def update_config_value(config_data, key, value):
 
                 # 更新对应的配置项
                 if key == 'NETWORK_SEARCH_ENABLED':
-                    current['categories']['network_search_settings']['settings']['search_enabled'] = {'value': value, 'type': 'boolean'}
+                    current['categories']['network_search_settings']['settings']['search_enabled'] = {'value': value,
+                                                                                                      'type': 'boolean'}
                 elif key == 'WEBLENS_ENABLED':
-                    current['categories']['network_search_settings']['settings']['weblens_enabled'] = {'value': value, 'type': 'boolean'}
+                    current['categories']['network_search_settings']['settings']['weblens_enabled'] = {'value': value,
+                                                                                                       'type': 'boolean'}
                 elif key == 'NETWORK_SEARCH_API_KEY':
                     current['categories']['network_search_settings']['settings']['api_key'] = {'value': value}
                 elif key == 'NETWORK_SEARCH_BASE_URL':
                     current['categories']['network_search_settings']['settings']['base_url'] = {'value': value}
                 return
-            
+
             # 特殊处理意图识别相关配置
             elif key in ['INTENT_API_KEY', 'INTENT_BASE_URL',
                          'INTENT_MODEL', 'INTENT_TEMPERATURE']:
@@ -724,13 +735,51 @@ def update_config_value(config_data, key, value):
 
                 # 更新对应的配置项
                 if key == 'INTENT_API_KEY':
-                    current['categories']['intent_recognition_settings']['settings']['api_key'] = {'value': value, 'type': 'string', 'is_secret': True}
+                    current['categories']['intent_recognition_settings']['settings']['api_key'] = {'value': value,
+                                                                                                   'type': 'string',
+                                                                                                   'is_secret': True}
                 elif key == 'INTENT_BASE_URL':
-                    current['categories']['intent_recognition_settings']['settings']['base_url'] = {'value': value, 'type': 'string'}
+                    current['categories']['intent_recognition_settings']['settings']['base_url'] = {'value': value,
+                                                                                                    'type': 'string'}
                 elif key == 'INTENT_MODEL':
-                    current['categories']['intent_recognition_settings']['settings']['model'] = {'value': value, 'type': 'string'}
+                    current['categories']['intent_recognition_settings']['settings']['model'] = {'value': value,
+                                                                                                 'type': 'string'}
                 elif key == 'INTENT_TEMPERATURE':
-                    current['categories']['intent_recognition_settings']['settings']['temperature'] = {'value': float(value), 'type': 'number', 'min': 0.0, 'max': 1.0}
+                    current['categories']['intent_recognition_settings']['settings']['temperature'] = {
+                        'value': float(value), 'type': 'number', 'min': 0.0, 'max': 1.0}
+                return
+
+            elif key in ['REPLY_DECISION_API_KEY', 'REPLY_DECISION_BASE_URL',
+                         'REPLY_DECISION_MODEL', 'REPLY_DECISION_TEMPERATURE', 'REPLY_DECISION_ENABLE']:
+
+                # 确保 reply_decision_settings 结构存在
+                if 'categories' not in current:
+                    current['categories'] = {}
+                if 'reply_decision_settings' not in current['categories']:
+                    current['categories']['reply_decision_settings'] = {'title': '回复判断配置', 'settings': {}}
+                if 'settings' not in current['categories']['reply_decision_settings']:
+                    current['categories']['reply_decision_settings']['settings'] = {}
+
+                # 更新字段
+                if key == 'REPLY_DECISION_API_KEY':
+                    current['categories']['reply_decision_settings']['settings']['api_key'] = {'value': value}
+                elif key == 'REPLY_DECISION_BASE_URL':
+                    current['categories']['reply_decision_settings']['settings']['base_url'] = {'value': value}
+                elif key == 'REPLY_DECISION_MODEL':
+                    current['categories']['reply_decision_settings']['settings']['model'] = {'value': value}
+                elif key == 'REPLY_DECISION_TEMPERATURE':
+                    current['categories']['reply_decision_settings']['settings']['temperature'] = {
+                        'value': float(value),
+                        'type': 'number',
+                        'min': 0.0,
+                        'max': 1.0
+                    }
+                elif key == 'REPLY_DECISION_ENABLE':
+                    current['categories']['reply_decision_settings']['settings']['enable'] = {
+                        'value': bool(value),
+                        'type': 'boolean'
+                    }
+
                 return
 
             # 遍历路径直到倒数第二个元素
@@ -741,8 +790,8 @@ def update_config_value(config_data, key, value):
 
             # 设置最终值，确保类型正确
             if isinstance(value, str) and key in ['MAX_TOKEN', 'TEMPERATURE', 'VISION_TEMPERATURE',
-                                               'MIN_COUNTDOWN_HOURS', 'MAX_COUNTDOWN_HOURS', 'MAX_GROUPS',
-                                               'QUEUE_TIMEOUT']:
+                                                  'MIN_COUNTDOWN_HOURS', 'MAX_COUNTDOWN_HOURS', 'MAX_GROUPS',
+                                                  'QUEUE_TIMEOUT']:
                 try:
                     # 尝试转换为数字
                     value = float(value)
@@ -764,6 +813,7 @@ def update_config_value(config_data, key, value):
 
     except Exception as e:
         logger.error(f"更新配置值失败 {key}: {str(e)}")
+
 
 # 添加上传处理路由
 @app.route('/upload_background', methods=['POST'])
@@ -791,10 +841,12 @@ def upload_background():
         "path": f"/background_image/{filename}"
     })
 
+
 # 添加背景图片目录的路由
 @app.route('/background_image/<filename>')
 def background_image(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 
 # 添加获取背景图片路由
 @app.route('/get_background')
@@ -819,6 +871,7 @@ def get_background():
             "message": str(e)
         })
 
+
 @app.before_request
 def load_config():
     """在每次请求之前加载配置"""
@@ -826,6 +879,7 @@ def load_config():
         g.config_data = load_config_file()
     except Exception as e:
         logger.error(f"加载配置失败: {str(e)}")
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -851,6 +905,7 @@ def dashboard():
         config_groups=config_groups,
         show_announcement=show_announcement  # 恢复Web页面公告显示
     )
+
 
 @app.route('/system_info')
 def system_info():
@@ -891,13 +946,13 @@ def system_info():
         return jsonify({
             'cpu': cpu_percent,
             'memory': {
-                'total': round(memory.total / (1024**3), 2),
-                'used': round(memory.used / (1024**3), 2),
+                'total': round(memory.total / (1024 ** 3), 2),
+                'used': round(memory.used / (1024 ** 3), 2),
                 'percent': memory.percent
             },
             'disk': {
-                'total': round(disk.total / (1024**3), 2),
-                'used': round(disk.used / (1024**3), 2),
+                'total': round(disk.total / (1024 ** 3), 2),
+                'used': round(disk.used / (1024 ** 3), 2),
                 'percent': disk.percent
             },
             'network': {
@@ -911,6 +966,7 @@ def system_info():
             'status': 'error',
             'message': str(e)
         }), 500
+
 
 @app.route('/check_update')
 def check_update():
@@ -934,6 +990,7 @@ def check_update():
             'has_update': False,
             'console_output': f'检查更新失败: {str(e)}'
         })
+
 
 @app.route('/confirm_update', methods=['POST'])
 def confirm_update():
@@ -967,9 +1024,11 @@ def confirm_update():
             'console_output': f'更新失败: {str(e)}'
         })
 
+
 # 全局变量存储更新进度
 update_progress_logs = []
 update_in_progress = False
+
 
 @app.route('/execute_update', methods=['POST'])
 def execute_update():
@@ -1023,6 +1082,7 @@ def execute_update():
     finally:
         update_in_progress = False
 
+
 @app.route('/update_progress')
 def get_update_progress():
     """获取更新进度日志"""
@@ -1031,6 +1091,7 @@ def get_update_progress():
         'logs': update_progress_logs,
         'in_progress': update_in_progress
     })
+
 
 def start_bot_process():
     """启动机器人进程，返回(成功状态, 消息)"""
@@ -1090,8 +1151,10 @@ def start_bot_process():
         logger.error(f"启动机器人失败: {str(e)}")
         return False, str(e)
 
+
 def start_log_reading_thread():
     """启动日志读取线程"""
+
     def read_output():
         try:
             while bot_process and bot_process.poll() is None:
@@ -1115,6 +1178,7 @@ def start_log_reading_thread():
     thread = threading.Thread(target=read_output, daemon=True)
     thread.start()
 
+
 def get_bot_uptime():
     """获取机器人运行时间"""
     if not bot_start_time or not bot_process or bot_process.poll() is not None:
@@ -1133,6 +1197,7 @@ def get_bot_uptime():
     else:
         return f"{seconds}秒"
 
+
 @app.route('/start_bot')
 def start_bot():
     """启动机器人"""
@@ -1141,6 +1206,7 @@ def start_bot():
         'status': 'success' if success else 'error',
         'message': message
     })
+
 
 @app.route('/get_bot_logs')
 def get_bot_logs():
@@ -1155,6 +1221,7 @@ def get_bot_logs():
         'uptime': get_bot_uptime(),
         'is_running': bot_process is not None and bot_process.poll() is None
     })
+
 
 def terminate_bot_process(force=False):
     """终止机器人进程的通用函数"""
@@ -1179,7 +1246,7 @@ def terminate_bot_process(force=False):
         # 确保所有子进程都被终止
         if sys.platform.startswith('win'):
             subprocess.run(['taskkill', '/F', '/T', '/PID', str(bot_process.pid)],
-                         capture_output=True)
+                           capture_output=True)
         else:
             # 使用 getattr 避免在 Windows 上直接引用不存在的属性
             killpg = getattr(os, 'killpg', None)
@@ -1206,10 +1273,12 @@ def terminate_bot_process(force=False):
         logger.error(f"停止机器人失败: {str(e)}")
         return False, f"停止失败: {str(e)}"
 
+
 def clear_bot_logs():
     """清空机器人日志队列"""
     while not bot_logs.empty():
         bot_logs.get()
+
 
 @app.route('/stop_bot')
 def stop_bot():
@@ -1219,6 +1288,7 @@ def stop_bot():
         'status': 'success' if success else 'error',
         'message': message
     })
+
 
 @app.route('/config')
 def config():
@@ -1233,7 +1303,8 @@ def config():
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
             if 'categories' in config_data and 'schedule_settings' in config_data['categories']:
-                if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in config_data['categories']['schedule_settings']['settings']:
+                if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in \
+                        config_data['categories']['schedule_settings']['settings']:
                     tasks = config_data['categories']['schedule_settings']['settings']['tasks'].get('value', [])
     except Exception as e:
         logger.error(f"读取任务数据失败: {str(e)}")
@@ -1250,6 +1321,7 @@ def config():
         active_page='config'
     )
 
+
 # 联网搜索配置已整合到高级配置页面
 
 # 在 app 初始化后添加
@@ -1260,6 +1332,7 @@ def serve_static(filename):
     if static_folder is None:
         static_folder = os.path.join(ROOT_DIR, 'src/webui/static')
     return send_from_directory(static_folder, filename)
+
 
 @app.route('/execute_command', methods=['POST'])
 def execute_command():
@@ -1322,7 +1395,7 @@ type - 显示文件内容
             memory = psutil.virtual_memory()
             return jsonify({
                 'status': 'success',
-                'output': f'内存使用: {memory.percent}% ({memory.used/1024/1024/1024:.1f}GB/{memory.total/1024/1024/1024:.1f}GB)'
+                'output': f'内存使用: {memory.percent}% ({memory.used / 1024 / 1024 / 1024:.1f}GB/{memory.total / 1024 / 1024 / 1024:.1f}GB)'
             })
 
         elif command.lower() == 'start':
@@ -1443,6 +1516,7 @@ type - 显示文件内容
             'error': f'执行命令失败: {str(e)}'
         })
 
+
 @app.route('/check_dependencies')
 def check_dependencies():
     """检查Python和pip环境"""
@@ -1491,10 +1565,10 @@ def check_dependencies():
                         line = line.strip()
                         # 跳过无效行：空行、注释、镜像源配置、-r 开头的文件包含
                         if (not line or
-                            line.startswith('#') or
-                            line.startswith('-i ') or
-                            line.startswith('-r ') or
-                            line.startswith('--')):
+                                line.startswith('#') or
+                                line.startswith('-i ') or
+                                line.startswith('-r ') or
+                                line.startswith('--')):
                             continue
 
                         # 只取包名，忽略版本信息和其他选项
@@ -1509,7 +1583,7 @@ def check_dependencies():
                 missing_deps = [
                     pkg for pkg in required_packages
                     if pkg not in installed_packages and not (
-                        pkg == 'wxauto' and 'wxauto-py' in installed_packages
+                            pkg == 'wxauto' and 'wxauto-py' in installed_packages
                     )
                 ]
 
@@ -1539,6 +1613,7 @@ def check_dependencies():
             'message': str(e)
         })
 
+
 @app.route('/favicon.ico')
 def favicon():
     """提供网站图标"""
@@ -1547,6 +1622,7 @@ def favicon():
         'mom.ico',
         mimetype='image/vnd.microsoft.icon'
     )
+
 
 def cleanup_processes():
     """清理所有相关进程"""
@@ -1595,7 +1671,7 @@ def cleanup_processes():
                     try:
                         logger.info(f"使用taskkill终止进程树 (PID: {bot_process.pid})...")
                         subprocess.run(['taskkill', '/F', '/T', '/PID', str(bot_process.pid)],
-                                     capture_output=True)
+                                       capture_output=True)
                     except Exception as e:
                         logger.error(f"使用taskkill终止进程失败: {str(e)}")
 
@@ -1634,11 +1710,13 @@ def cleanup_processes():
     except Exception as e:
         logger.error(f"清理进程失败: {str(e)}")
 
+
 def signal_handler(signum, frame):
     """信号处理函数"""
     logger.info(f"收到信号: {signum}")
     cleanup_processes()
     sys.exit(0)
+
 
 # 注册信号处理器
 signal.signal(signal.SIGINT, signal_handler)
@@ -1654,8 +1732,10 @@ if sys.platform.startswith('win'):
 # 注册退出处理
 atexit.register(cleanup_processes)
 
+
 def open_browser(port):
     """在新线程中打开浏览器"""
+
     def _open_browser():
         # 等待服务器启动
         time.sleep(1.5)
@@ -1665,6 +1745,7 @@ def open_browser(port):
 
     # 创建新线程来打开浏览器
     threading.Thread(target=_open_browser, daemon=True).start()
+
 
 def create_job_object():
     global job_object
@@ -1704,6 +1785,7 @@ def create_job_object():
         logger.error(f"创建作业对象失败: {str(e)}")
     return False
 
+
 # 添加控制台关闭事件处理
 def setup_console_control_handler():
     try:
@@ -1720,6 +1802,7 @@ def setup_console_control_handler():
     except Exception as e:
         logger.error(f"设置控制台关闭事件处理器失败: {str(e)}")
 
+
 def main():
     """主函数"""
     from data.config import config
@@ -1728,9 +1811,9 @@ def main():
     if sys.platform.startswith('win'):
         os.system("@chcp 65001 >nul")  # 使用 >nul 来隐藏输出而不清屏
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print_status("配置管理系统启动中...", "info", "LAUNCH")
-    print("-"*50)
+    print("-" * 50)
 
     # 创建作业对象来管理子进程
     create_job_object()
@@ -1813,7 +1896,7 @@ def main():
         print_status(f"端口{original_port}被占用，自动选择端口{port}", "warning", "WARNING")
 
     print_status("正在启动Web服务...", "info", "INTERNET")
-    print("-"*50)
+    print("-" * 50)
     print_status("配置管理系统已就绪！", "success", "STAR_1")
 
     # 显示所有可用的访问地址
@@ -1832,7 +1915,7 @@ def main():
     except Exception as e:
         logger.error(f"获取IP地址失败: {str(e)}")
 
-    print("="*50 + "\n")
+    print("=" * 50 + "\n")
 
     # 启动浏览器
     open_browser(port)
@@ -1858,6 +1941,7 @@ def main():
             print_status(f"网络错误：{str(e)}", "error", "CROSS")
     except Exception as e:
         print_status(f"启动Web服务失败：{str(e)}", "error", "CROSS")
+
 
 @app.route('/install_dependencies', methods=['POST'])
 def install_dependencies():
@@ -1912,9 +1996,11 @@ def install_dependencies():
             'message': str(e)
         })
 
+
 def hash_password(password: str) -> str:
     # 对密码进行哈希处理
     return hashlib.sha256(password.encode()).hexdigest()
+
 
 def is_local_network() -> bool:
     # 检查是否是本地网络访问
@@ -1922,11 +2008,12 @@ def is_local_network() -> bool:
     if client_ip is None:
         return True
     return (
-        client_ip == '127.0.0.1' or
-        client_ip.startswith('192.168.') or
-        client_ip.startswith('10.') or
-        client_ip.startswith('172.16.')
+            client_ip == '127.0.0.1' or
+            client_ip.startswith('192.168.') or
+            client_ip.startswith('10.') or
+            client_ip.startswith('172.16.')
     )
+
 
 @app.before_request
 def check_auth():
@@ -1948,6 +2035,7 @@ def check_auth():
 
     if not session.get('logged_in'):
         return redirect(url_for('login'))
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1989,6 +2077,7 @@ def login():
         'status': 'error',
         'message': '密码错误'
     })
+
 
 @app.route('/init_password', methods=['GET', 'POST'])
 def init_password():
@@ -2050,11 +2139,13 @@ def init_password():
             'message': str(e)
         }), 500
 
+
 @app.route('/logout')
 def logout():
     # 退出登录
     session.clear()
     return redirect(url_for('login'))
+
 
 @app.route('/get_model_configs')
 def get_model_configs():
@@ -2097,7 +2188,7 @@ def get_model_configs():
 
         # 过滤和排序提供商
         active_providers = [p for p in configs['api_providers']
-                          if p.get('status') == 'active']
+                            if p.get('status') == 'active']
         active_providers.sort(key=lambda x: x.get('priority', 999))
 
         # 构建返回配置
@@ -2123,6 +2214,7 @@ def get_model_configs():
             'status': 'error',
             'message': f'获取模型配置失败: {str(e)}'
         })
+
 
 @app.route('/save_quick_setup', methods=['POST'])
 def save_quick_setup():
@@ -2215,10 +2307,12 @@ def save_quick_setup():
         logger.error(f"保存快速设置失败: {str(e)}")
         return jsonify({"status": "error", "message": str(e)})
 
+
 @app.route('/quick_setup')
 def quick_setup():
     """快速设置页面"""
     return render_template('quick_setup.html')
+
 
 # 添加获取可用人设列表的路由
 @app.route('/get_available_avatars')
@@ -2279,6 +2373,7 @@ def get_available_avatars_route():
             'message': str(e)
         })
 
+
 # 修改加载指定人设内容的路由
 @app.route('/load_avatar_content')
 def load_avatar_content():
@@ -2293,7 +2388,8 @@ def load_avatar_content():
         # 如果文件不存在，创建一个空文件
         if not os.path.exists(avatar_path):
             with open(avatar_path, 'w', encoding='utf-8') as f:
-                f.write("# Task\n请在此输入任务描述\n\n# Role\n请在此输入角色设定\n\n# Appearance\n请在此输入外表描述\n\n")
+                f.write(
+                    "# Task\n请在此输入任务描述\n\n# Role\n请在此输入角色设定\n\n# Appearance\n请在此输入外表描述\n\n")
 
         # 读取角色设定文件并解析内容
         sections = {}
@@ -2332,6 +2428,7 @@ def load_avatar_content():
             'message': str(e)
         })
 
+
 @app.route('/get_tasks', methods=['GET'])
 def get_tasks():
     """获取定时任务列表"""
@@ -2340,7 +2437,8 @@ def get_tasks():
 
         tasks = []
         if 'categories' in config_data and 'schedule_settings' in config_data['categories']:
-            if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in config_data['categories']['schedule_settings']['settings']:
+            if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in \
+                    config_data['categories']['schedule_settings']['settings']:
                 tasks = config_data['categories']['schedule_settings']['settings']['tasks'].get('value', [])
 
         return jsonify({
@@ -2353,6 +2451,7 @@ def get_tasks():
             'status': 'error',
             'message': str(e)
         })
+
 
 @app.route('/save_task', methods=['POST'])
 def save_task():
@@ -2442,6 +2541,7 @@ def save_task():
             'message': str(e)
         })
 
+
 @app.route('/delete_task', methods=['POST'])
 def delete_task():
     """删除定时任务"""
@@ -2460,7 +2560,8 @@ def delete_task():
 
         # 获取任务列表
         if 'categories' in config_data and 'schedule_settings' in config_data['categories']:
-            if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in config_data['categories']['schedule_settings']['settings']:
+            if 'settings' in config_data['categories']['schedule_settings'] and 'tasks' in \
+                    config_data['categories']['schedule_settings']['settings']:
                 tasks = config_data['categories']['schedule_settings']['settings']['tasks']['value']
 
                 # 查找并删除任务
@@ -2495,6 +2596,7 @@ def delete_task():
             'message': str(e)
         })
 
+
 @app.route('/get_all_configs')
 def get_all_configs():
     """获取所有最新的配置数据"""
@@ -2511,12 +2613,15 @@ def get_all_configs():
         # 处理用户设置
         if 'categories' in config_data:
             # 用户设置
-            if 'user_settings' in config_data['categories'] and 'settings' in config_data['categories']['user_settings']:
+            if 'user_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'user_settings']:
                 configs['基础配置'] = {}
                 if 'listen_list' in config_data['categories']['user_settings']['settings']:
-                    configs['基础配置']['LISTEN_LIST'] = config_data['categories']['user_settings']['settings']['listen_list']
+                    configs['基础配置']['LISTEN_LIST'] = config_data['categories']['user_settings']['settings'][
+                        'listen_list']
                 if 'group_chat_config' in config_data['categories']['user_settings']['settings']:
-                    configs['基础配置']['GROUP_CHAT_CONFIG'] = config_data['categories']['user_settings']['settings']['group_chat_config']
+                    configs['基础配置']['GROUP_CHAT_CONFIG'] = config_data['categories']['user_settings']['settings'][
+                        'group_chat_config']
 
             # LLM设置
             if 'llm_settings' in config_data['categories'] and 'settings' in config_data['categories']['llm_settings']:
@@ -2535,7 +2640,8 @@ def get_all_configs():
                     configs['基础配置']['AUTO_MODEL_SWITCH'] = llm_settings['auto_model_switch']
 
             # 媒体设置
-            if 'media_settings' in config_data['categories'] and 'settings' in config_data['categories']['media_settings']:
+            if 'media_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'media_settings']:
                 media_settings = config_data['categories']['media_settings']['settings']
 
                 # 图像识别设置
@@ -2573,7 +2679,8 @@ def get_all_configs():
                         configs['TTS 服务配置']['TTS_MODEL_ID'] = {'value': tts['tts_model_id'].get('value', '')}
 
             # 行为设置
-            if 'behavior_settings' in config_data['categories'] and 'settings' in config_data['categories']['behavior_settings']:
+            if 'behavior_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'behavior_settings']:
                 behavior = config_data['categories']['behavior_settings']['settings']
 
                 # 主动消息配置
@@ -2612,7 +2719,8 @@ def get_all_configs():
                         configs['人设配置']['AVATAR_DIR'] = context['avatar_dir']
 
             # 网络搜索设置
-            if 'network_search_settings' in config_data['categories'] and 'settings' in config_data['categories']['network_search_settings']:
+            if 'network_search_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'network_search_settings']:
                 network_search = config_data['categories']['network_search_settings']['settings']
                 configs['网络搜索配置'] = {}
                 if 'search_enabled' in network_search:
@@ -2625,7 +2733,8 @@ def get_all_configs():
                     configs['网络搜索配置']['NETWORK_SEARCH_BASE_URL'] = network_search['base_url']
 
             # 意图识别设置
-            if 'intent_recognition_settings' in config_data['categories'] and 'settings' in config_data['categories']['intent_recognition_settings']:
+            if 'intent_recognition_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'intent_recognition_settings']:
                 intent_recog = config_data['categories']['intent_recognition_settings']['settings']
                 configs['意图识别配置'] = {}
                 if 'api_key' in intent_recog:
@@ -2637,8 +2746,24 @@ def get_all_configs():
                 if 'temperature' in intent_recog:
                     configs['意图识别配置']['INTENT_TEMPERATURE'] = intent_recog['temperature']
 
+            if 'reply_decision_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'reply_decision_settings']:
+                reply_recog = config_data['categories']['reply_decision_settings']['settings']
+                configs['回复判断配置'] = {}
+                if 'api_key' in reply_recog:
+                    configs['回复判断配置']['REPLY_DECISION_API_KEY'] = reply_recog['api_key']
+                if 'base_url' in reply_recog:
+                    configs['回复判断配置']['REPLY_DECISION_URL'] = reply_recog['base_url']
+                if 'model' in reply_recog:
+                    configs['回复判断配置']['REPLY_DECISION_MODEL'] = reply_recog['model']
+                if 'temperature' in reply_recog:
+                    configs['回复判断配置']['REPLY_DECISION_TEMPERATURE'] = reply_recog['temperature']
+                if 'enable' in reply_recog:
+                    configs['回复判断配置']['REPLY_DECISION_ENABLE'] = reply_recog['enable']
+
             # 定时任务
-            if 'schedule_settings' in config_data['categories'] and 'settings' in config_data['categories']['schedule_settings']:
+            if 'schedule_settings' in config_data['categories'] and 'settings' in config_data['categories'][
+                'schedule_settings']:
                 if 'tasks' in config_data['categories']['schedule_settings']['settings']:
                     tasks = config_data['categories']['schedule_settings']['settings']['tasks'].get('value', [])
 
@@ -2657,13 +2782,14 @@ def get_all_configs():
             'message': str(e)
         })
 
+
 @app.route('/get_announcement')
 def get_announcement():
     try:
         # 使用统一的公告管理器获取公告
         from src.autoupdate.announcement import get_current_announcement
         announcement = get_current_announcement()
-        
+
         if announcement and announcement.get('enabled', False):
             logger.info("从公告管理器获取到有效公告")
             return jsonify(announcement)
@@ -2682,18 +2808,19 @@ def get_announcement():
             'content': f'<div class="text-danger">错误信息: {str(e)}</div>'
         })
 
+
 @app.route('/dismiss_announcement', methods=['POST'])
 def dismiss_announcement():
     """忽略当前公告，不再显示"""
     try:
         from src.autoupdate.announcement import dismiss_announcement as dismiss_func
-        
+
         # 获取请求中的公告ID（可选）
         data = request.get_json() if request.is_json else {}
         announcement_id = data.get('announcement_id', None)
-        
+
         success = dismiss_func(announcement_id)
-        
+
         if success:
             logger.info(f"用户忽略了公告: {announcement_id or '当前公告'}")
             return jsonify({
@@ -2705,7 +2832,7 @@ def dismiss_announcement():
                 'success': False,
                 'message': '忽略公告失败'
             }), 400
-            
+
     except Exception as e:
         logger.error(f"忽略公告失败: {e}")
         return jsonify({
@@ -2713,30 +2840,6 @@ def dismiss_announcement():
             'message': f'操作失败: {str(e)}'
         }), 500
 
-@app.route('/reconnect_wechat')
-def reconnect_wechat():
-    try:
-        # 导入微信登录点击器
-        from src.Wechat_Login_Clicker.Wechat_Login_Clicker import click_wechat_buttons
-
-        # 执行点击操作
-        result = click_wechat_buttons()
-
-        if result is False:
-            return jsonify({
-                'status': 'error',
-                'message': '找不到微信登录窗口'
-            })
-
-        return jsonify({
-            'status': 'success',
-            'message': '微信重连操作已执行'
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': f'微信重连失败: {str(e)}'
-        })
 
 @app.route('/get_vision_api_configs')
 def get_vision_api_configs():
@@ -2794,6 +2897,7 @@ def get_vision_api_configs():
             "message": str(e)
         })
 
+
 if __name__ == '__main__':
     try:
         main()
@@ -2806,4 +2910,3 @@ if __name__ == '__main__':
     except Exception as e:
         print_status(f"系统错误: {str(e)}", "error", "ERROR")
         cleanup_processes()
-

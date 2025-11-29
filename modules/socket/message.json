@@ -1,0 +1,6 @@
+﻿{
+  "type": "rpc" | "chat" | "system",
+  "event": "...",
+  "payload": { ... },
+  "request_id": "xxx" // 若有
+}
