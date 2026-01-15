@@ -271,11 +271,11 @@ def message_dispatcher():
             except queue.Empty:
                 continue
 
-            who = msg.chat_name  # 会话名
+            who = msg.sender  # 会话名
             sender = msg.sender
             content = msg.content
             msg_id = msg.id
-            msgtype = msg.type
+            msgtype = 'friend'
 
             if not who or not sender:
                 logger.debug("消息缺少 chat_name 或 sender，已忽略")

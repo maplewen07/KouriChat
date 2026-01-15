@@ -706,7 +706,8 @@ class MessageHandler:
                 clean_part = part
 
                 if clean_part.strip():
-                    self.ws_sender.send_text(chat_id=chat_id, content=clean_part.strip(), sender=self.current_avatar)
+                    self.ws_sender.send_text(sender_name=chat_id, content=clean_part.strip(),
+                                             sender=self.current_avatar)
                     logger.debug(f"发送消息: {clean_part[:20]}...")
 
                 time.sleep(random.randint(4, 8))
@@ -715,7 +716,7 @@ class MessageHandler:
             clean_reply = reply
 
             if clean_reply.strip():
-                self.ws_sender.send_text(chat_id=chat_id, content=clean_reply.strip(), sender=self.current_avatar)
+                self.ws_sender.send_text(sender_name=chat_id, content=clean_reply.strip(), sender=self.current_avatar)
                 logger.debug(f"发送消息: {clean_reply[:20]}...")
 
     def _send_raw_message(self, text: str, chat_id: str):
@@ -740,7 +741,7 @@ class MessageHandler:
                 clean_text = clean_text.replace('＄', '')  # 全角$符号
                 clean_text = clean_text.replace(r'\n', '\r\n\r\n')
                 # logger.info(clean_text)
-                self.ws_sender.send_text(chat_id=chat_id, content=clean_text, sender=self.current_avatar)
+                self.ws_sender.send_text(sender_name=chat_id, content=clean_text, sender=self.current_avatar)
 
                 # logger.info(f"已发送经过处理的文件内容: {file_content}")
 

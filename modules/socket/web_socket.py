@@ -1,9 +1,5 @@
-﻿# modules/socket/web_socket.py
-import asyncio
-import logging
-
+﻿import asyncio
 import websockets
-from queue import Queue
 from typing import Optional
 
 from .gateway import SocketGateway
@@ -25,6 +21,13 @@ async def handle(websocket):
 
     except Exception as e:
         print(f"处理客户端数据时发生错误: {e}")
+    finally:
+        # 断开时清理绑定
+        try:
+            if _gateway is not None and getattr(_gateway, "sender", None) is not None:
+                _gateway.sender.unbind(websocket)
+        except Exception:
+            pass
 
 
 async def run_server(host="0.0.0.0", port=12345):
@@ -38,12 +41,11 @@ def start_websocket_server(inbound_queue, sender, switch_avatar_func=None, logge
 
     loop = asyncio.new_event_loop()
     sender.set_event_loop(loop)
-
     asyncio.set_event_loop(loop)
 
     _gateway = SocketGateway(
         inbound_queue=inbound_queue,
-        sender=sender,                # ⭐ 新增
+        sender=sender,
         switch_avatar_func=switch_avatar_func,
         logger=logger,
     )

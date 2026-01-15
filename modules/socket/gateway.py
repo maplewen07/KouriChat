@@ -1,7 +1,4 @@
-﻿# modules/socket/gateway.py
-from queue import Queue
-from typing import Optional, Callable, Any
-from collections import deque
+﻿from collections import deque
 import json
 import time
 
@@ -13,13 +10,13 @@ class SocketGateway:
     WebSocket 网关：
     - 解析顶层 Envelope
     - 按 type/event 分发
-    - chat: 保存最近 100 条消息，并推入 message_dispatcher
+    - chat: 保存最近 N 条消息，并推入 message_dispatcher
     - rpc/system: 执行指令
     """
 
     def __init__(self, inbound_queue, sender, switch_avatar_func=None, logger=None, message_cache_limit=100):
         self.inbound_queue = inbound_queue
-        self.sender = sender  # ⭐ 新增
+        self.sender = sender
         self.switch_avatar_func = switch_avatar_func
         self.logger = logger
         self.message_cache = deque(maxlen=message_cache_limit)
@@ -36,7 +33,7 @@ class SocketGateway:
                     "type": "system",
                     "event": "error",
                     "payload": {"message": str(e)},
-                }))
+                }, ensure_ascii=False))
             except Exception:
                 pass
             return
@@ -59,20 +56,19 @@ class SocketGateway:
             "msg_type": msg.type,
             "content": msg.content,
             "sender": msg.sender,
-            "chat_name": msg.chat_name,
+            "chat_id": msg.chat_id,
             "role": envelope.role,
             "timestamp": time.time(),
         })
 
         if self.logger:
-            self.logger.debug(
-                f"[Gateway] chat: {msg.sender}({msg.chat_name}) → {msg.content}"
-            )
+            self.logger.debug(f"[Gateway] chat: {msg.sender}({msg.chat_id}) → {msg.content}")
 
-        # 在 _handle_chat() 中：
-        self.sender.bind_chat(msg.chat_name, websocket)
+        # ✅ 关键：按 sender 绑定 websocket，并记录该 sender 的 chat_id
+        # 这样你就可以 sender.send_text(sender_name="maplewen", ...) 直接回消息
+        self.sender.bind_sender(msg.sender, msg.chat_id, websocket)
 
-        # 推送给 dispatcher（保持原结构）
+        # 推送给 dispatcher
         self.inbound_queue.put(msg)
 
         # 可选：按 role 自动切人设
@@ -104,7 +100,6 @@ class SocketGateway:
             return await self._reply_ok(websocket, envelope, {"pong": True})
 
         elif event == "get_recent_messages":
-            # ⭐ 新增 RPC：返回最近消息
             history = list(self.message_cache)
             return await self._reply_ok(websocket, envelope, {"messages": history})
 
@@ -118,7 +113,7 @@ class SocketGateway:
                 "event": "pong",
                 "payload": {},
                 "request_id": envelope.request_id,
-            }))
+            }, ensure_ascii=False))
 
     async def _reply_ok(self, websocket, envelope, data):
         await websocket.send(json.dumps({
@@ -126,7 +121,7 @@ class SocketGateway:
             "event": envelope.event + ".ok",
             "payload": data,
             "request_id": envelope.request_id,
-        }))
+        }, ensure_ascii=False))
 
     async def _reply_error(self, websocket, envelope, message: str):
         await websocket.send(json.dumps({
@@ -134,4 +129,4 @@ class SocketGateway:
             "event": envelope.event + ".error",
             "payload": {"message": message},
             "request_id": envelope.request_id,
-        }))
+        }, ensure_ascii=False))

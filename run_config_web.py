@@ -35,10 +35,6 @@ from datetime import timedelta
 from src.utils.console import print_status
 from src.avatar_manager import avatar_manager  # 导入角色设定管理器
 from src.webui.routes.avatar import avatar_bp
-import win32api
-import win32con
-import win32job
-import win32process
 
 # 在文件开头添加全局变量声明
 bot_process = None

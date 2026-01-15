@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  config-web:
+    build: .
+    container_name: kourichat-config-web
+    restart: unless-stopped
+    ports:
+      - "8502:8502"  # Config web UI
+      - "16667:16667"  # WebSocket server (for chatbot subprocess)
+    volumes:
+      - ./data:/app/data  # persist configuration and avatars
+      - ./logs:/app/logs  # persist logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    command: python run_config_web.py
+    # The config web interface will start chatbot as subprocess
+    # No need for separate chatbot service

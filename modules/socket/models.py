@@ -1,5 +1,4 @@
-﻿# modules/socket/models.py
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 from typing import Literal, Optional, Dict, Any
 import json
 
@@ -26,7 +25,6 @@ class SocketEnvelope:
 
     @classmethod
     def from_raw(cls, raw: str) -> "SocketEnvelope":
-        """从原始 JSON 字符串解析为协议对象"""
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -51,28 +49,40 @@ class SocketEnvelope:
 @dataclass
 class ChatPayload:
     """
-    chat 类型消息的 payload：
+    chat payload（新协议）：
     {
-      "msg_id": "...",
+      "msg_id": "1700000000",
       "msg_type": "friend",
-      "chat_name": "张三",
-      "sender": "张三",
+      "chat_id": "!room:server/",
+      "sender": "maplewen",
       "content": "你好"
     }
+
+    兼容旧字段：
+    - chat_name -> chat_id
     """
     msg_id: Optional[str]
     msg_type: str
-    chat_name: str
+    chat_id: str
     sender: str
     content: str
 
     @classmethod
     def from_payload(cls, payload: Dict[str, Any]) -> "ChatPayload":
+        sender = payload.get("sender") or ""
+
+        # ✅ 新字段 chat_id 优先；兼容旧 chat_name
+        chat_id = payload.get("chat_id") or payload.get("chat_name") or ""
+
+        msg_type = payload.get("msg_type") or "friend"
+        msg_id = payload.get("msg_id")
+        msg_id = str(msg_id) if msg_id is not None else None
+
         return cls(
-            msg_id=payload.get("msg_id"),
-            msg_type=payload.get("msg_type", "friend"),
-            chat_name=payload.get("chat_name") or payload.get("sender") or "",
-            sender=payload.get("sender") or "",
+            msg_id=msg_id,
+            msg_type=msg_type,
+            chat_id=chat_id,
+            sender=sender,
             content=payload.get("content") or "",
         )
 
@@ -80,19 +90,13 @@ class ChatPayload:
 @dataclass
 class SocketMessage:
     """
-    提供给 message_dispatcher / PrivateChatBot 使用的统一消息对象
-    尽量模拟原来 wxauto 的 msg：
-      - id
-      - type
-      - content
-      - sender
-      - who/chat_name
+    统一消息对象（给 dispatcher 用）
     """
     id: Optional[str]
     type: str
     content: str
     sender: str
-    chat_name: str  # 相当于原来的 who
+    chat_id: str
 
     @classmethod
     def from_chat(cls, chat: ChatPayload) -> "SocketMessage":
@@ -101,5 +105,5 @@ class SocketMessage:
             type=chat.msg_type,
             content=chat.content,
             sender=chat.sender,
-            chat_name=chat.chat_name,
+            chat_id=chat.chat_id,
         )
